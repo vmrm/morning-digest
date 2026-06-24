@@ -1,0 +1,15 @@
+services:
+  morning-digest:
+    build: .
+    container_name: morning-digest
+    restart: unless-stopped
+    env_file: .env
+    # Ограничиваем логи, чтобы не забить диск NAS со временем
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    # Скромные лимиты — сервис почти всё время спит
+    mem_limit: 128m
+    cpus: 0.5
