@@ -24,7 +24,9 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY digest.py entrypoint.sh ./
-RUN chmod +x entrypoint.sh
+# COPY сохраняет режим из контекста сборки (у автора файлы 600) — выставляем
+# права явно, иначе non-root пользователь не сможет прочитать digest.py.
+RUN chmod 0644 digest.py && chmod 0755 entrypoint.sh
 
 # Непривилегированный пользователь
 RUN useradd --create-home --uid 1000 app

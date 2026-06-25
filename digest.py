@@ -84,7 +84,7 @@ def get_todays_events(calendars, tz) -> list[tuple[datetime.datetime, str, str]]
     events = []
     for cal in calendars:
         try:
-            results = cal.date_search(start=start, end=end, expand=True)
+            results = cal.search(start=start, end=end, event=True, expand=True)
             for vevent in results:
                 vevent.load()
                 parsed = Calendar.from_ical(vevent.data)
@@ -111,7 +111,7 @@ def get_todays_events(calendars, tz) -> list[tuple[datetime.datetime, str, str]]
                         )
                     events.append((sort_key, time_str, summary))
         except Exception as e:
-            log.debug("Skipping calendar %s: %s", cal, e)
+            log.warning("Skipping calendar %s: %s", cal, e)
 
     events.sort(key=lambda x: x[0])
     return events
@@ -124,7 +124,9 @@ def get_todays_reminders(calendars) -> list[str]:
 
     for cal in calendars:
         try:
-            todos = cal.todos()
+            # include_completed=True: при False caldav шлёт iCloud сложный
+            # REPORT-фильтр, который тот отвергает с 500. Завершённые отсекаем ниже.
+            todos = cal.todos(include_completed=True)
             for todo in todos:
                 todo.load()
                 parsed = Calendar.from_ical(todo.data)
@@ -145,7 +147,7 @@ def get_todays_reminders(calendars) -> list[str]:
                         # Напоминания без срока тоже показываем
                         reminders.append(summary)
         except Exception as e:
-            log.debug("Skipping todos in calendar %s: %s", cal, e)
+            log.warning("Skipping todos in calendar %s: %s", cal, e)
 
     return reminders
 
@@ -203,7 +205,13 @@ def send_telegram(text: str, *, markdown: bool = True) -> None:
 
         def _post():
             resp = requests.post(url, json=payload, timeout=15)
-            resp.raise_for_status()
+            if resp.status_code >= 400:
+                # Берём описание из тела, НЕ из URL — иначе в лог утечёт токен.
+                try:
+                    desc = resp.json().get("description", resp.text[:200])
+                except ValueError:
+                    desc = resp.text[:200]
+                raise RuntimeError(f"Telegram API {resp.status_code}: {desc}")
             return resp
 
         with_retries(_post, what="telegram sendMessage")

@@ -1,15 +1,23 @@
 #!/bin/sh
 set -eu
 
-# Рендерим crontab из переменной окружения и запускаем supercronic.
-# CRON_SCHEDULE — стандартное cron-выражение (по умолчанию каждый день в 08:00).
-# Время интерпретируется в локальной зоне контейнера (TZ).
+# Разовый запуск с аргументами (docker compose run ... <cmd>) — выполняем их
+# и не поднимаем планировщик. Удобно для теста: `... run --rm md python digest.py`.
+if [ "$#" -gt 0 ]; then
+  exec "$@"
+fi
 
+# Рендерим crontab и запускаем supercronic.
+# supercronic выполняет команду без шелла, поэтому никаких `cd`/`&&` —
+# только абсолютный бинарь и скрипт. Время — в локальной зоне (TZ).
 CRONTAB=/tmp/crontab
-echo "${CRON_SCHEDULE} cd /app && python digest.py" > "$CRONTAB"
+echo "${CRON_SCHEDULE} /usr/local/bin/python /app/digest.py" > "$CRONTAB"
 
 # Baseline для HEALTHCHECK: до первого срабатывания считаем контейнер живым.
 date -u +%Y-%m-%dT%H:%M:%SZ > "${HEARTBEAT_FILE}" 2>/dev/null || true
 
 echo "morning-digest: schedule='${CRON_SCHEDULE}' TZ='${TZ:-?}'"
-exec supercronic "$CRONTAB"
+# -no-reap: на ядре Synology pid1-reaper supercronic фаталит ("Failed to fork
+# exec") ещё до чтения crontab. Reaper не нужен — задача порождает один дочерний
+# процесс в сутки, который завершается сам.
+exec supercronic -no-reap "$CRONTAB"
