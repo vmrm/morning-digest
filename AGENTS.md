@@ -55,11 +55,14 @@
    `exec supercronic -no-reap "$CRONTAB"`. Reaper не нужен — задача порождает
    один дочерний процесс, который завершается сам.
 
-7. **iCloud + `caldav`: `cal.todos()` падает с 500.**
-   При `include_completed=False` библиотека шлёт Apple сложный REPORT-фильтр —
-   iCloud отвечает `500 Internal Server Error`, и напоминания тихо пропадают.
-   → Звать `cal.todos(include_completed=True)`, а завершённые (`STATUS:COMPLETED`)
-   отфильтровывать в коде.
+7. **iCloud Reminders недоступны через CalDAV (фича убрана).**
+   После апгрейда iCloud Reminders («upgraded reminders», списки с ⚠️ в имени)
+   Apple не отдаёт задачи через CalDAV — остаются только служебные заглушки
+   («Где найти мои напоминания?» и т.п.). Публичного API нет (только EventKit на
+   устройстве или Shortcuts). → Напоминания из дайджеста удалены, остался только
+   календарь. Если вернёшь — данные брать НЕ из CalDAV.
+   Побочно: `cal.todos()` на iCloud к тому же падает с `500`, если не передать
+   `include_completed=True` (сложный REPORT-фильтр сервер отвергает).
 
 8. **Не глушить ошибки на `debug`.**
    Перехват per-calendar ошибок логировался на `log.debug` — полный отказ выборки

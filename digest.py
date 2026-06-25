@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """
-Morning digest: iCloud Calendar + Reminders → Telegram
+Morning digest: iCloud Calendar → Telegram
 Timezone: Europe/Berlin, отправка в 08:00 каждый день
+
+Напоминания (Reminders) сознательно не поддерживаются: после апгрейда iCloud
+Reminders Apple не отдаёт их через CalDAV (см. AGENTS.md).
 """
 
 import datetime
@@ -117,42 +120,7 @@ def get_todays_events(calendars, tz) -> list[tuple[datetime.datetime, str, str]]
     return events
 
 
-def get_todays_reminders(calendars) -> list[str]:
-    """Возвращает незавершённые напоминания со сроком сегодня или раньше."""
-    today = datetime.date.today()
-    reminders = []
-
-    for cal in calendars:
-        try:
-            # include_completed=True: при False caldav шлёт iCloud сложный
-            # REPORT-фильтр, который тот отвергает с 500. Завершённые отсекаем ниже.
-            todos = cal.todos(include_completed=True)
-            for todo in todos:
-                todo.load()
-                parsed = Calendar.from_ical(todo.data)
-                for component in parsed.walk():
-                    if component.name != "VTODO":
-                        continue
-                    status = str(component.get("status", "")).upper()
-                    if status == "COMPLETED":
-                        continue
-                    summary = str(component.get("summary", "Без названия"))
-                    due = component.get("due")
-                    if due:
-                        dt = due.dt
-                        due_date = dt.date() if isinstance(dt, datetime.datetime) else dt
-                        if due_date <= today:
-                            reminders.append(summary)
-                    else:
-                        # Напоминания без срока тоже показываем
-                        reminders.append(summary)
-        except Exception as e:
-            log.warning("Skipping todos in calendar %s: %s", cal, e)
-
-    return reminders
-
-
-def format_message(events: list[tuple], reminders: list[str]) -> str:
+def format_message(events: list[tuple]) -> str:
     today = datetime.date.today()
     weekdays = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
     weekday = weekdays[today.weekday()]
@@ -165,15 +133,6 @@ def format_message(events: list[tuple], reminders: list[str]) -> str:
             lines.append(f"  • {md_escape(time_str)} — {md_escape(summary)}")
     else:
         lines.append("📅 Встреч сегодня нет")
-
-    lines.append("")
-
-    if reminders:
-        lines.append("✅ *Напоминалки:*")
-        for r in reminders[:15]:  # не больше 15
-            lines.append(f"  • {md_escape(r)}")
-    else:
-        lines.append("✅ Напоминалок нет")
 
     return "\n".join(lines)
 
@@ -246,8 +205,7 @@ def run_digest() -> bool:
         principal = with_retries(client.principal, what="caldav principal")
         calendars = with_retries(principal.calendars, what="caldav calendars")
         events = get_todays_events(calendars, tz)
-        reminders = get_todays_reminders(calendars)
-        message = format_message(events, reminders)
+        message = format_message(events)
         send_telegram(message)
         _touch_heartbeat()
         return True
