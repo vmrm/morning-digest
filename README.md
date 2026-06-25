@@ -1,7 +1,10 @@
 # Morning digest
 
-Каждое утро тянет события календаря и напоминания из iCloud (CalDAV) и шлёт
-дайджест в Telegram. Рассчитан на работу в Docker на Synology NAS.
+Каждое утро тянет события календаря из iCloud (CalDAV) и шлёт дайджест в
+Telegram. Рассчитан на работу в Docker на Synology NAS.
+
+> Напоминания (Reminders) не поддерживаются: после апгрейда iCloud Reminders
+> Apple перестал отдавать их через CalDAV (см. AGENTS.md).
 
 Планировщик — [supercronic](https://github.com/aptible/supercronic) внутри
 контейнера (cron-семантика, логи в stdout). `digest.py` — one-shot: по
